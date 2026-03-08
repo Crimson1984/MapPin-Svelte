@@ -6,7 +6,7 @@
 
   const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3000' : '';
 
-  // ⚡️ 3. 组件挂载时，主动去后端拉取“我”的详细信息
+  // ⚡️ 组件挂载时，主动去后端拉取“我”的详细信息
   onMount(async () => {
     // 如果已经登录，且当前还没有加载过头像
     if ($currentUser.isLoggedIn && !$currentUser.avatar) {
@@ -31,12 +31,13 @@
 </script>
 
 {#if $currentUser.isLoggedIn}
-  <div class="absolute top-6 right-6 z-10">
+  <div class="absolute top-6 right-6 z-[20]">
     <button 
-      class="flex items-center gap-3 bg-white/90 backdrop-blur-md p-2 pr-4 rounded-full shadow-lg hover:bg-gray-50 transition border border-gray-100 cursor-pointer"
+      class="group flex items-center gap-2 cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 bg-transparent border-none outline-none"
       onclick={openMyProfile}
+      title="查看个人主页"
     >
-      <Avatar.Root class="h-10 w-10 border-2 border-white shadow-sm">
+      <Avatar.Root class="h-10 w-10 border-2 border-white shadow-md group-hover:shadow-lg transition-shadow">
         <Avatar.Image 
           src={$currentUser.avatar ? ($currentUser.avatar.startsWith('http') ? $currentUser.avatar : `${SERVER_URL}${$currentUser.avatar}`) : `${SERVER_URL}/uploads/avatars/default-avatar.png`} 
           alt="Avatar" 
@@ -44,10 +45,9 @@
         <Avatar.Fallback>{$currentUser.username?.charAt(0).toUpperCase()}</Avatar.Fallback>
       </Avatar.Root>
       
-      <div class="flex flex-col text-left">
-        <span class="text-sm font-bold text-gray-800 leading-none">{$currentUser.username}</span>
-        <span class="text-xs text-gray-500 mt-1">查看主页</span>
-      </div>
+      <span class="text-sm font-bold text-gray-800 group-hover:text-blue-600 transition-colors [text-shadow:0_1px_4px_rgba(255,255,255,0.9)]">
+        {$currentUser.username}
+      </span>
     </button>
   </div>
 {/if}

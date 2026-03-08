@@ -1,8 +1,6 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
-
 @import "tw-animate-css";
-
 
 
 
@@ -130,3 +128,40 @@
 }
 
 .custom-leaflet-popup .leaflet-popup-content { margin: 12px; }
+
+/* ==========================================
+   强制覆盖 Leaflet 原生 UI，使其符合现代审美
+   ========================================== */
+
+/* 去除原生粗糙的边框和阴影，替换为现代毛玻璃与圆角 */
+.leaflet-bar,
+.leaflet-control-layers {
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12) !important;
+  border-radius: 16px !important;
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  overflow: hidden;
+}
+
+/* 调整原生图层按钮的悬停效果 */
+.leaflet-control-layers-toggle {
+  width: 48px !important;
+  height: 48px !important;
+  transition: all 0.2s ease !important;
+}
+
+.leaflet-control-layers-toggle:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 展开后的图层选择面板美化 */
+.leaflet-control-layers-expanded {
+  padding: 12px 16px !important;
+  border-radius: 16px !important;
+  color: #374151 !important; /* text-gray-700 */
+  font-family: inherit !important;
+  font-size: 14px !important;
+}
+

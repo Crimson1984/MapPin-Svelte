@@ -13,7 +13,7 @@
 
   import { 
     Loader2, AlertCircle, Settings, Users, UserPlus, MapPin, Ghost, Navigation,UserMinus, 
-    UserCheck, Clock,Check, X, Bell,Trash2,Camera, Save, Lock
+    UserCheck, Clock,Check, X, Bell,Trash2,Camera, Save, Lock, LogOut
   } from 'lucide-svelte';
 
   const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3000' : '';
@@ -296,6 +296,29 @@ function handleNoteClick(note) {
       };
     }
 }
+
+  // ==========================================
+  // ⚡️ 退出登录逻辑
+  // ==========================================
+  function handleLogout() {
+    // 1. 物理销毁：清空 localStorage 里的令牌
+    localStorage.removeItem('userToken');
+    
+    // (可选) 如果你还存了用户信息，一并带走
+    localStorage.removeItem('username');
+    
+    // 2. 状态复位：把全局的用户状态设为未登录
+    $currentUser = { 
+      isLoggedIn: false, 
+      token: null, 
+      username: '',  
+    };
+
+    // 视线清理：关闭当前的个人主页抽屉/侧边栏
+    $uiState.isProfileDrawerOpen = false;
+
+    $uiState.isAuthModalOpen = true;
+  }
 </script>
 
 <Sheet.Root open={$uiState.isProfileDrawerOpen} onOpenChange={handleOpenChange}>
@@ -370,6 +393,14 @@ function handleNoteClick(note) {
               <Button variant="outline" class="rounded-full px-6 shadow-sm hover:bg-gray-50" onclick={startEditProfile}>
                 <Settings class="w-4 h-4 mr-2" /> 编辑资料
               </Button>
+
+              <Button 
+                  variant="outline" 
+                  class="rounded-full px-4 shadow-sm text-red-500 border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors" 
+                  onclick={handleLogout}
+                >
+                  <LogOut class="w-4 h-4 mr-1.5" /> 退出
+                </Button>
             {/if}
             
           {:else if profileData.relation === 'friend'}

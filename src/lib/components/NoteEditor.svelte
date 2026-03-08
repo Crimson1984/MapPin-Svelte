@@ -13,7 +13,7 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Label } from "$lib/components/ui/label/index.js";
-  import { Save, Send, Image as ImageIcon, Eye, Edit3, Loader2, Bold, Italic, Heading, Quote, List, Link } from 'lucide-svelte';
+  import { Save, Send, Image as ImageIcon, Eye, Edit3, Loader2, Bold, Italic, Heading, Quote, List, Link, X} from 'lucide-svelte';
 
   const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3000' : '';
 
@@ -250,7 +250,7 @@
     <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 shrink-0">
       <Dialog.Title class="text-xl font-bold flex items-center gap-2">
         <Edit3 class="w-5 h-5 text-blue-500" />
-        {$uiState.editingNote?.id ? '编辑笔记' : '发布新笔记'}
+        {$uiState.editingNote?.id ? '编辑笔记' : '发布笔记'}
       </Dialog.Title>
       
       <div class="flex items-center gap-4">
@@ -267,6 +267,23 @@
             <Send class="w-4 h-4 mr-2" /> {$uiState.editingNote?.id ? '保存修改' : '立即发布'}
           {/if}
         </Button>
+
+        <!-- <div class="w-[1px] h-6 bg-gray-200 mx-1 hidden sm:block"></div> -->
+
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          class="rounded-full w-8 h-8 text-gray-400 hover:text-gray-700 hover:bg-gray-200/50 active:scale-95 transition-all"
+          onclick={() => { 
+            $uiState.isEditorOpen = false; 
+            $uiState.editingNote = null; 
+          }}
+          title="关闭编辑器"
+        >
+          <X class="w-5 h-5" />
+          <span class="sr-only">关闭</span>
+        </Button>
+
       </div>
     </div>
 

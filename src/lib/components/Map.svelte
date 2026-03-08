@@ -21,6 +21,7 @@
   let userLocationMarker;
   let rawUserLocation = null; // ⚡️ 新增：用来记住用户真实的 GPS 坐标
   let tempMarker = null; // ⚡️ 用来存放搜索产生的临时红点
+  let customToolsWrapper;// 一个绑定变量，抓取 Svelte 渲染的现代按钮组
 
   // ==========================================
   // 🗺️ 1. 地图初始化 (仅执行一次)
@@ -61,6 +62,21 @@
 
     // 依然保留底图切换控制器 (因为它需要读取内部配置，保留原生最方便)
     L.control.layers(layers, null, { position: 'bottomleft', collapsed: true }).addTo(mapInstance);
+
+    //创建一个自定义的 Leaflet 控件
+    const modernToolsControl = L.control({ position: 'bottomleft' }); // 同样放在左下角
+
+    modernToolsControl.onAdd = function() {
+    // 阻止点击事件穿透到底层地图（极其重要，否则点按钮地图会跟着动）
+    L.DomEvent.disableClickPropagation(customToolsWrapper);
+    L.DomEvent.disableScrollPropagation(customToolsWrapper);
+    
+    // 直接把我们的 Svelte 节点作为原生控件交出去！
+    return customToolsWrapper; 
+    };
+
+    // 将自定义控件加入地图。Leaflet 会自动把它完美地堆叠在图层控件的上方！
+    modernToolsControl.addTo(mapInstance);
 
     // ==========================================
     // ⚡️ 注册地图双击/右键 打点事件
@@ -184,6 +200,7 @@
         // 更新全局状态，关闭所有弹窗，准备新建
         $uiState.clickedLatLng = e.latlng;
     });
+    
   });
 
   // ==========================================
@@ -379,30 +396,38 @@
     // ⚡️ 指令执行完毕，销毁载荷
     $uiState.flyToLocation = null;
   }
+
+  
 </script>
 
 <div class="relative w-screen h-screen">
   <div bind:this={mapElement} class="w-full h-full z-0"></div>
 
-  <div class="absolute bottom-6 right-6 z-10 flex flex-col gap-3">
+  <div 
+    bind:this={customToolsWrapper} 
+    class="flex flex-col bg-white/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/60 rounded-2xl overflow-hidden mb-2"
+  >
     
     <button 
-      class="p-3 bg-white rounded-full shadow-lg hover:bg-gray-50 transition border border-gray-100 cursor-pointer"
-      onclick={toggleHeatmap}
+      class="relative w-[44px] h-[44px] flex items-center justify-center text-gray-600 hover:text-blue-600 hover:bg-gray-500/5 active:bg-gray-500/10 transition-all duration-200 group cursor-pointer"
+      onclick={locateMe}
+      title="定位当前位置"
     >
-      {#if $uiState.mapViewMode === 'heatmap'}
-        <Flame class="w-6 h-6 text-red-500" />
-      {:else}
-        <MapPin class="w-6 h-6 text-blue-500" />
-      {/if}
+      <LocateFixed class="w-5 h-5 group-active:scale-90 transition-transform duration-200" />
     </button>
+
+    <div class="w-8 h-[1px] bg-gray-200/60 mx-auto"></div>
 
     <button 
-      class="p-3 bg-white rounded-full shadow-lg hover:bg-gray-50 transition border border-gray-100 cursor-pointer"
-      onclick={locateMe}
+      class="relative w-[44px] h-[44px] flex items-center justify-center hover:bg-gray-500/5 active:bg-gray-500/10 transition-all duration-200 group cursor-pointer"
+      onclick={toggleHeatmap}
+      title="切换热图"
     >
-      <LocateFixed class="w-6 h-6 text-gray-700" />
+      {#if $uiState.mapViewMode === 'heatmap'}
+        <Flame class="w-5 h-5 text-red-500 drop-shadow-sm group-active:scale-90 transition-transform duration-200" />
+      {:else}
+        <MapPin class="w-5 h-5 text-gray-600 group-hover:text-blue-600 group-active:scale-90 transition-transform duration-200" />
+      {/if}
     </button>
-
   </div>
 </div>

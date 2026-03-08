@@ -37,7 +37,6 @@ export const uiState = writable({
   // 弹窗与抽屉开关
   isQuickEditOpen: false,    // 是否展开底部/侧边快捷发布栏
   isFullEditorOpen: false,   // 是否打开详细编辑器抽屉
-  isProfileOpen: false,      // 是否打开个人主页抽屉
   isAuthModalOpen: false,    // 是否打开登录/注册弹窗
 
   isProfileDrawerOpen: false, // 抽屉是否打开
