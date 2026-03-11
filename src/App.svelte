@@ -7,6 +7,7 @@
   import FloatingCard from '$lib/components/FloatingCard.svelte';
   import NoteEditor from '$lib/components/NoteEditor.svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
+  import ObservationBanner from '$lib/components/ObservationBanner.svelte';
   
   import { notesData, currentUser, uiState } from '$lib/stores.js';
   import { refreshDraftsStore } from '$lib/utils/draftManager.js';
@@ -41,6 +42,11 @@
         console.error("加载笔记失败", err);
       }
     }
+
+  async function restoreGlobalMap() {
+  if ($currentUser.isLoggedIn) {await loadServerNotes();}
+  console.log("已退出探索模式，正在重新加载全球地图...");
+}
 </script>
 
 <main class="relative h-screen w-screen overflow-hidden bg-gray-100">
@@ -58,5 +64,7 @@
   <FloatingCard />
 
   <NoteEditor />
+
+  <ObservationBanner onExit={restoreGlobalMap} />
 
 </main>

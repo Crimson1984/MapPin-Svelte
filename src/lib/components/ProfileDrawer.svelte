@@ -13,7 +13,7 @@
 
   import { 
     Loader2, AlertCircle, Settings, Users, UserPlus, MapPin, Ghost, Navigation,UserMinus, 
-    UserCheck, Clock,Check, X, Bell,Trash2,Camera, Save, Lock, LogOut
+    UserCheck, Clock,Check, X, Bell,Trash2,Camera, Save, Lock, LogOut, Compass
   } from 'lucide-svelte';
 
   const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3000' : '';
@@ -319,6 +319,23 @@ function handleNoteClick(note) {
 
     $uiState.isAuthModalOpen = true;
   }
+
+  // ⚡️ 触发观察模式的函数
+  async function startObserving() {
+    // 1. 设置全局观察目标
+    $uiState.observingTarget = profileData.profile.username;
+
+    
+    // 2. 关闭个人主页抽屉 (请替换为你实际控制关闭的变量)
+    $uiState.isProfileDrawerOpen = false; 
+        
+    // 3. 触发获取该用户专属笔记的 API
+    // 假设你有一个方法可以传入 userId 获取笔记
+    const userNotes = await API.getNotes($uiState.observingTarget);
+    console.log("观察模式 - 获取到的用户笔记:", userNotes);
+    if (Array.isArray(userNotes)) $notesData = userNotes;
+
+  }
 </script>
 
 <Sheet.Root open={$uiState.isProfileDrawerOpen} onOpenChange={handleOpenChange}>
@@ -400,10 +417,24 @@ function handleNoteClick(note) {
                   onclick={handleLogout}
                 >
                   <LogOut class="w-4 h-4 mr-1.5" /> 退出
-                </Button>
+              </Button>
+
+              <Button 
+                class="rounded-full px-5 shadow-md bg-indigo-600 hover:bg-indigo-700 text-white transition-all"
+                onclick={startObserving}
+              >
+                <Compass class="w-4 h-4 mr-2" /> 探索
+              </Button>
             {/if}
             
           {:else if profileData.relation === 'friend'}
+            <Button 
+                class="rounded-full px-5 shadow-md bg-indigo-600 hover:bg-indigo-700 text-white transition-all"
+                onclick={startObserving}
+              >
+                <Compass class="w-4 h-4 mr-2" /> 探索
+            </Button>
+
             <Button 
               variant="outline" 
               class="rounded-full px-6 border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200 group transition-all"
@@ -419,11 +450,25 @@ function handleNoteClick(note) {
             </Button>
 
           {:else if profileData.relation === 'pending_sent'}
+            <Button 
+                class="rounded-full px-5 shadow-md bg-indigo-600 hover:bg-indigo-700 text-white transition-all"
+                onclick={startObserving}
+              >
+                <Compass class="w-4 h-4 mr-2" /> 探索
+            </Button>
+
             <Button variant="secondary" disabled class="rounded-full px-6">
               <Clock class="w-4 h-4 mr-2" /> 请求已发送
             </Button>
 
           {:else if profileData.relation === 'pending_received'}
+            <Button 
+                class="rounded-full px-5 shadow-md bg-indigo-600 hover:bg-indigo-700 text-white transition-all"
+                onclick={startObserving}
+              >
+                <Compass class="w-4 h-4 mr-2" /> 探索
+            </Button>
+            
             <Button 
               class="rounded-full px-6 shadow-md bg-blue-600 hover:bg-blue-700 text-white" 
               disabled={isActionLoading} 
@@ -446,6 +491,13 @@ function handleNoteClick(note) {
             </Button>
 
           {:else}
+            <Button 
+                class="rounded-full px-5 shadow-md bg-indigo-600 hover:bg-indigo-700 text-white transition-all"
+                onclick={startObserving}
+              >
+                <Compass class="w-4 h-4 mr-2" /> 探索
+            </Button>
+
             <Button class="rounded-full px-6 shadow-md" disabled={isActionLoading} onclick={handleAddFriend}>
               {#if isActionLoading}
                 <Loader2 class="w-4 h-4 mr-2 animate-spin" /> 发送中...
