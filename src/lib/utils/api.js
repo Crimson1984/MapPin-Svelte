@@ -146,5 +146,6 @@ export const API = {
 
 
     //高德API
-    searchPlaces: (query) => request(`/gaode/search?q=${encodeURIComponent(query)}`)
+    searchPlaces: (query) => request(`/gaode/search?q=${encodeURIComponent(query)}`),
+    regeoAmap: (lat, lng) => request(`/gaode/regeo?lat=${lat}&lng=${lng}`),
 };

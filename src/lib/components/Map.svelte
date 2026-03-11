@@ -10,7 +10,7 @@
   import { Flame, MapPin , LocateFixed } from 'lucide-svelte'; // 引入 Lucide 图标
   import { uiState, notesData, draftsData } from '$lib/stores.js';
   import { TILE_LAYERS_CONFIG, getIconForNote } from '$lib/mapConfig.js';
-  import { toView, isCoordinateSystemChanged} from '$lib/utils/coordManager.js'; 
+  import { toView, isCoordinateSystemChanged, toDB} from '$lib/utils/coordManager.js'; 
   import QuickCreatePopup from './QuickCreatePopup.svelte';
   import { mount, unmount } from 'svelte';
 
@@ -84,8 +84,7 @@
     mapInstance.on('dblclick', (e) => {
       // 阻止默认的双击放大行为 (可选，视你需求而定)
       mapInstance.doubleClickZoom.disable(); 
-      const lat = e.latlng.lat;
-      const lng = e.latlng.lng;
+      const [lat, lng] = toDB(e.latlng.lat, e.latlng.lng); // 转回数据库坐标系存储
 
       // 关闭正在阅读的卡片
       $uiState.activeNote = null;
@@ -241,7 +240,7 @@
       marker.bindTooltip(`
         <div class="flex flex-col items-center gap-1">
             <span class="font-bold text-gray-800 text-sm tracking-wide">${note.title}</span>
-            <span class="text-xs text-gray-500 font-medium">${note.username} · ${dateStr}</span>
+            <span class="text-xs text-gray-500 font-medium">${note.username} · ${note.location_name} · ${dateStr}</span>
         </div>
       `, { 
         direction: 'top', 

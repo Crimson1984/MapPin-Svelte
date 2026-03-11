@@ -488,14 +488,15 @@ function handleNoteClick(note) {
                   >
                     
                     <div class="p-2 sm:p-2.5 bg-blue-50 text-blue-500 rounded-lg group-hover:bg-blue-500 group-hover:text-white transition-colors duration-200 shrink-0 mt-0.5">
-                      <MapPin class="w-4 h-4 sm:w-5 sm:h-5" />
+                      <MapPin class="w-4 h-4 sm:w-5 sm:h-5" />            
                     </div>
+
                     
                     <div class="flex-1 min-w-0">
                       
                       <div class="flex items-center justify-between gap-2">
                         <h4 class="font-bold text-gray-800 truncate text-sm sm:text-base">{note.title}</h4>
-                        
+                       
                         {#if note.visibility === 'private'}
                           <div class="flex items-center text-xs text-red-400 bg-red-50 px-1.5 py-0.5 rounded shrink-0">
                             <Lock class="w-3 h-3 mr-1" /> 私密
@@ -514,8 +515,9 @@ function handleNoteClick(note) {
                       {/if}
                       
                       <p class="text-[10px] sm:text-xs text-gray-400 mt-1.5">
-                        {note.updated_at || note.created_at ? new Date(note.updated_at || note.created_at).toLocaleDateString() : '未知时间'}
+                        {note.updated_at || note.created_at ? new Date(note.updated_at || note.created_at).toLocaleDateString() : '未知时间'} · {note.location_name || '未知地点'}
                       </p>
+
                       
                     </div>             
                   </button>

@@ -3,6 +3,8 @@
   import { uiState } from '$lib/stores.js';
   import { saveDraft, removeDraft } from '$lib/utils/draftManager.js'; // ⚡️ 引入草稿管理员
   import { API } from '$lib/utils/api.js';
+  import { toView, toDB} from '$lib/utils/coordManager.js';
+  import { notesData } from '$lib/stores.js';
   
   import { MapPin, Maximize2, Send, Loader2, Save } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
@@ -16,6 +18,14 @@
   let content = '';
   let visibility = 'public';
   let isPublishing = false;
+
+
+  let locationName = ''; 
+  let isFetchingAddress = false;
+
+  $: if (lat && lng) {
+    fetchAddress(lat, lng);
+  }
 
   const draftKey = `draft_new_${lat}_${lng}`;
 
@@ -35,7 +45,6 @@
   });
 
   // ==========================================
-  // ⚡️ 彻底删除了 handleInput 的自动保存逻辑
   // 关闭弹窗如果没点保存，数据会随 DOM 销毁而自然丢失
   // ==========================================
 
@@ -44,7 +53,7 @@
     if (!title.trim() && !content.trim()) return; // 全空不存
     
     // 构建标准的 draft 对象并交给草稿管理器
-    const draftData = { lat, lng, title, content, visibility, isDirty: true };
+    const draftData = { lat, lng, title, content, visibility, isDirty: true, locationName };
     saveDraft(draftData); 
     
     if (closePopup) closePopup(); // 存完关闭，地图会自动刷新出灰点
@@ -52,7 +61,7 @@
 
   // 3. 打开详细编辑器 (纯内存传递，不写硬盘)
   function openFullEditor() {
-    $uiState.editingNote = { lat, lng, title, content, visibility };
+    $uiState.editingNote = { lat, lng, title, content, visibility, locationName };
     $uiState.isEditorOpen = true;
     if (closePopup) closePopup();
   }
@@ -63,13 +72,14 @@
     
     isPublishing = true;
     try {
-      const res = await API.createNote({ title, content, visibility, lat, lng });
+      const res = await API.createNote({ title, content, visibility, lat, lng, location_name: locationName || null });
       if (res.success) {
         // ⚡️ 发布成功后，调用 draftManager 的标准删除方法，清理干净
         removeDraft({ lat, lng }); 
         
         // 通知 App.svelte 或地图刷新数据 (这里使用原生事件或靠 API 重新拉取)
-        if (window.loadNotes) window.loadNotes();
+        const allNotes = await API.getNotes();
+        if (Array.isArray(allNotes)) $notesData = allNotes;
         if (closePopup) closePopup();
       } else {
         alert('发布失败: ' + res.message);
@@ -78,6 +88,33 @@
       alert('网络错误，请重试');
     } finally {
       isPublishing = false;
+    }
+  }
+
+  // ⚡️ 后台静默查询真实地址
+  async function fetchAddress(targetLat, targetLng) {
+    isFetchingAddress = true;
+    try {
+      const currentLayer = localStorage.getItem('MAPPIN_LAYER') || 'osm';
+
+      if (currentLayer === 'gaode') {
+        const [gcjLat, gcjLng] = toView(targetLat, targetLng);
+        const res = await API.regeoAmap(gcjLat, gcjLng);
+        if (res && res.success && res.locationName) {
+          locationName = res.locationName;
+        }
+      } else {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${targetLat}&lon=${targetLng}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data.display_name) {
+          locationName = data.name || data.display_name.split(',').slice(0, 2).join(', ');
+        }
+      }
+    } catch (err) {
+      console.error('快捷发布定位失败:', err);
+    } finally {
+      isFetchingAddress = false;
     }
   }
 </script>

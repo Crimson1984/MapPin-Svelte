@@ -4,7 +4,7 @@
   import DOMPurify from 'dompurify';
   
   import { uiState, currentUser } from '$lib/stores.js';
-  import { X, User, Clock, Edit3, Trash2 } from 'lucide-svelte';
+  import { X, User, Clock, Edit3, Trash2, MapPin } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
 
@@ -205,6 +205,11 @@
           <button class="flex items-center hover:text-blue-600 transition" onclick={() => openProfile($uiState.activeNote.username)}>
             <User class="w-3.5 h-3.5 mr-1" /> {$uiState.activeNote.username || $currentUser.username}
           </button>
+
+          <span class="flex items-center hover:text-blue-600 transition">
+            <MapPin class="w-3.5 h-3.5 mr-1" /> {$uiState.activeNote.location_name || null}
+          </span>
+
           <span class="flex items-center">
             <Clock class="w-3.5 h-3.5 mr-1" /> 
             {new Date($uiState.activeNote.created_at || $uiState.activeNote.lastModified).toLocaleDateString()}

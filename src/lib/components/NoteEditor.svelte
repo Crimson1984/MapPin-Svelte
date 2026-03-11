@@ -7,13 +7,14 @@
   import { API } from '$lib/utils/api.js';
 
   import {removeDraft, saveDraft} from '$lib/utils/draftManager.js'; // ⚡️ 引入草稿管理器
+  import { toView, toDB} from '$lib/utils/coordManager.js';
   
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import * as Tabs from "$lib/components/ui/tabs/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Label } from "$lib/components/ui/label/index.js";
-  import { Save, Send, Image as ImageIcon, Eye, Edit3, Loader2, Bold, Italic, Heading, Quote, List, Link, X} from 'lucide-svelte';
+  import { Save, Send, Image as ImageIcon, Eye, Edit3, Loader2, Bold, Italic, Heading, Quote, List, Link, X, MapPin} from 'lucide-svelte';
 
   const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3000' : '';
 
@@ -31,6 +32,10 @@
 
   // 👁️ 预览模式开关
   let isPreviewMode = false;
+
+  // ⚡️ 物理地名状态
+  let locationName = ''; 
+  let isFetchingAddress = false; // 控制加载动画，提升 UX
 
   function togglePreview() {
     isPreviewMode = !isPreviewMode;
@@ -60,7 +65,8 @@
       // 🟢 情况 A: 用户正在【修改已发布的笔记】
       const draftKey = `draft_edit_${note.id}`;
       const savedDraft = localStorage.getItem(draftKey);
-      
+      locationName = $uiState.editingNote.location_name || '';
+
       // 只有存在修改痕迹时，才弹窗询问是否覆盖数据库原版
       if (savedDraft && confirm(`检测到未发布的修改痕迹，是否恢复？`)) {
         const parsed = JSON.parse(savedDraft);
@@ -78,20 +84,23 @@
       title = decodeHtml(note.title) || '';
       content = decodeHtml(note.content) || '';
       visibility = note.visibility || 'public';
+      fetchAddress($uiState.editingNote.lat, $uiState.editingNote.lng);
     }
     
     saveStatus = '';
   }
 
+
+
   // ==========================================
   // ⚡️ 2. 自动保存引擎 (防抖机制)
   // ==========================================
-  // 只要 title 或 content 发生变化，就会触发这个响应式块
+  //只要 title 或 content 发生变化，就会触发这个响应式块
   $: if ($uiState.isEditorOpen && (title !== undefined || content !== undefined)) {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
       saveDraftToLocal();
-    }, 2000); // 用户停手 2 秒后自动保存
+    }, 5000); // 用户停手 2 秒后自动保存
   }
 
   function saveDraftToLocal() {
@@ -100,13 +109,13 @@
     if(note.id) {
       // 已发布笔记的草稿
       const draftKey = `draft_edit_${note.id}`;
-      const draftData = { ...note, title, content, visibility, updated_at: new Date().getTime() };
+      const draftData = { ...note, title, content, visibility, updated_at: new Date().getTime(), location_name: locationName };
       saveDraft(draftData);
       showStatus('草稿已自动保存');
     } else {
       // 新笔记的草稿
       const draftKey = `draft_new_${note.lat}_${note.lng}`;
-      const draftData = { ...note, title, content, visibility, updated_at: new Date().getTime() };
+      const draftData = { ...note, title, content, visibility, updated_at: new Date().getTime(), location_name: locationName };
       saveDraft(draftData);
       showStatus('草稿已自动保存');
     }
@@ -214,18 +223,18 @@
     
     isPublishing = true;
     const note = $uiState.editingNote;
-    const draftKey = note.id ? `draft_edit_${note.id}` : `draft_new_${note.lat}_${note.lng}`;
+    const draftKey = note.id ? {id:note.id} : {lat: note.lat, lng: note.lng};
 
     try {
       let res;
       if (note.id) {
-        res = await API.updateNote(note.id, { title, content, visibility });
+        res = await API.updateNote(note.id, { title, content, visibility, location_name: locationName.trim() || null });
       } else {
-        res = await API.createNote({ title, content, visibility, lat: note.lat, lng: note.lng });
+        res = await API.createNote({ title, content, visibility, lat: note.lat , lng: note.lng, location_name: locationName.trim() || null });
       }
 
       if (res.success) {
-        localStorage.removeItem(draftKey);
+        removeDraft(draftKey);
         
         const allNotes = await API.getNotes();
         if (Array.isArray(allNotes)) $notesData = allNotes;
@@ -242,45 +251,99 @@
       isPublishing = false;
     }
   }
+
+  // ==========================================
+  // ⚡️ 双擎逆地理编码 (感知物理世界)
+  // ==========================================
+  async function fetchAddress(lat, lng) {
+    isFetchingAddress = true;
+    try {
+      // 1. 获取当前用户正在使用的地图底图模式 (高德 or OSM)
+      const currentLayer = localStorage.getItem('MAPPIN_LAYER') || 'osm';
+
+      if (currentLayer === 'gaode') {
+        // ----------------------------------------
+        // 🇨🇳 模式 A：高德精准国内解析
+        // ----------------------------------------
+        // 核心防御：高德只认火星坐标(GCJ02)！用你写的 toView 进行动态加密
+        const [gcjLat, gcjLng] = toView(lat, lng);
+        
+        // 呼叫你的 Node.js 后端代理
+        const res = await API.regeoAmap(gcjLat, gcjLng);
+        
+        if (res && res.success && res.locationName) {
+          locationName = res.locationName;
+        }
+
+      } else {
+        // ----------------------------------------
+        // 🌍 模式 B：OSM 全球网络解析 (Nominatim)
+        // ----------------------------------------
+        // OSM 直接接收国际标准 WGS84 坐标，无需加密，完全白嫖
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        if (data && data.display_name) {
+          // 数据清洗：优先用精准的 name，没有就把冗长的完整地址切取前两段
+          locationName = data.name || data.display_name.split(',').slice(0, 2).join(', ');
+        }
+      }
+
+    } catch (err) {
+      console.error('地理坐标解析双擎灾难性失败:', err);
+      // 容错处理：即使断网或 API 报错，也不要弹红字报错阻塞用户
+      // 直接把地址留空，让用户自己手动填即可
+    } finally {
+      isFetchingAddress = false;
+    }
+  }
+
 </script>
 
 <Dialog.Root bind:open={$uiState.isEditorOpen} onOpenChange={(v) => { if(!v) $uiState.editingNote = null; }}>
   <Dialog.Content class="w-full h-[100dvh] max-w-none p-0 flex flex-col md:h-[85vh] md:max-w-4xl md:rounded-2xl overflow-hidden bg-white [&>button.absolute]:hidden" >
     
-    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 shrink-0">
-      <Dialog.Title class="text-xl font-bold flex items-center gap-2">
-        <Edit3 class="w-5 h-5 text-blue-500" />
-        {$uiState.editingNote?.id ? '编辑笔记' : '发布笔记'}
+
+    <div class="relative px-3 py-3 sm:px-6 sm:py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 shrink-0">
+      
+      <Dialog.Title class="text-base sm:text-xl font-bold flex items-center gap-1.5 sm:gap-2 min-w-0 pr-2">
+        <Edit3 class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 shrink-0" />
+        <span class="truncate">{$uiState.editingNote?.id ? '编辑' : '发布'}笔记</span>
       </Dialog.Title>
       
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 sm:gap-4 shrink-0">
+        
         {#if saveStatus}
-          <span transition:fade class="text-xs text-green-600 flex items-center font-medium">
-            <Save class="w-3.5 h-3.5 mr-1" /> {saveStatus}
+          <span 
+            transition:fade 
+            class="absolute left-1/2 -translate-x-1/2 sm:static sm:translate-x-0 text-[10px] sm:text-xs text-green-600 flex items-center font-medium bg-green-50 sm:bg-transparent px-2.5 py-1 sm:p-0 rounded-full shadow-sm sm:shadow-none whitespace-nowrap z-10"
+          >
+            <Save class="w-3 sm:w-3.5 h-3 sm:h-3.5 mr-1" /> {saveStatus}
           </span>
         {/if}
         
-        <Button size="sm" class="rounded-full px-5 shadow-md" disabled={isPublishing} onclick={handlePublish}>
+        <Button size="sm" class="rounded-full px-3 sm:px-5 h-8 sm:h-9 shadow-md text-xs sm:text-sm transition-all" disabled={isPublishing} onclick={handlePublish}>
           {#if isPublishing}
-            <Loader2 class="w-4 h-4 mr-2 animate-spin" /> 处理中...
+            <Loader2 class="w-3.5 h-3.5 sm:mr-1.5 animate-spin" /> 
+            <span class="hidden sm:inline">处理中...</span>
           {:else}
-            <Send class="w-4 h-4 mr-2" /> {$uiState.editingNote?.id ? '保存修改' : '立即发布'}
+            <Send class="w-3.5 h-3.5 sm:mr-1.5" /> 
+            <span>{$uiState.editingNote?.id ? '保存' : '发布'}</span>
           {/if}
         </Button>
-
-        <!-- <div class="w-[1px] h-6 bg-gray-200 mx-1 hidden sm:block"></div> -->
 
         <Button 
           variant="ghost" 
           size="icon" 
-          class="rounded-full w-8 h-8 text-gray-400 hover:text-gray-700 hover:bg-gray-200/50 active:scale-95 transition-all"
+          class="rounded-full w-8 h-8 text-gray-400 hover:text-gray-700 hover:bg-gray-200/50 active:scale-95 transition-all shrink-0"
           onclick={() => { 
             $uiState.isEditorOpen = false; 
             $uiState.editingNote = null; 
           }}
           title="关闭编辑器"
         >
-          <X class="w-5 h-5" />
+          <X class="w-4 sm:w-5 h-4 sm:h-5" />
           <span class="sr-only">关闭</span>
         </Button>
 
@@ -289,26 +352,49 @@
 
     <div class="flex flex-col flex-1 overflow-hidden p-6 gap-6">
       
-      <div class="flex flex-col md:flex-row gap-4 shrink-0">
-        <div class="flex-1 space-y-2">
-          <Label for="title" class="text-gray-500">标题</Label>
-          <Input id="title" bind:value={title} placeholder="给这个足迹起个名字..." class="text-lg font-medium h-12" />
-        </div>
-        <div class="w-full md:w-48 space-y-2">
-          <Label for="visibility" class="text-gray-500">可见性</Label>
+      <div class="flex flex-col gap-3 shrink-0 pb-2">
+
+        <Input 
+          id="title" 
+          bind:value={title} 
+          placeholder="给笔记起个名字..." 
+          aria-label="标题"
+          class="text-base md:text-lg font-bold h-11 shadow-sm focus-visible:ring-blue-500 border-gray-200" 
+        />
+
+        <div class="flex flex-row items-center gap-3">
+
+          <div class="relative flex items-center flex-1 group min-w-0">
+            <div class="absolute left-3 text-gray-400 group-focus-within:text-blue-500 transition-colors">
+              {#if isFetchingAddress}
+                <Loader2 class="w-4 h-4 animate-spin" />
+              {:else}
+                <MapPin class="w-4 h-4" />
+              {/if}
+            </div>
+            <Input 
+              id="location" 
+              bind:value={locationName} 
+              placeholder={isFetchingAddress ? "定位中..." : "你在哪里？(可修改)"} 
+              aria-label="物理位置"
+              class="pl-9 h-10 text-sm bg-gray-50/50 border-gray-200 text-gray-600 focus:bg-white focus:border-blue-300 transition-all shadow-sm w-full truncate" 
+            />
+          </div>
+
           <select 
             id="visibility" 
             bind:value={visibility} 
-            class="flex h-12 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            aria-label="可见性"
+            class="flex h-10 w-28 md:w-32 shrink-0 items-center justify-between rounded-md border border-gray-200 bg-white px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-shadow cursor-pointer hover:bg-gray-50"
           >
-            <option value="public">🌍 公开 (所有人可见)</option>
-            <option value="friends">👥 仅好友可见</option>
-            <option value="private">🔒 私密 (仅自己可见)</option>
+            <option value="public">🌍 公开</option>
+            <option value="friends">👥 好友</option>
+            <option value="private">🔒 私密</option>
           </select>
+
         </div>
       </div>
 
-      
       <div class="flex-1 flex flex-col min-h-0 border border-gray-200 rounded-xl overflow-hidden bg-gray-50/50 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:bg-white transition-all shadow-sm">
         
         <div class="flex items-center gap-1 p-2 border-b border-gray-200 bg-white shrink-0 overflow-x-auto">
