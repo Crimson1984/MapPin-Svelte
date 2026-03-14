@@ -42,6 +42,7 @@ export const uiState = writable({
   isProfileDrawerOpen: false, // 抽屉是否打开
   currentProfileUser: null,   // 当前正在查看哪个用户的主页 (字符串，如 'garvofadge')
   observingTarget: null,
+  observingTag: null,
 
   // ⚡️ 悬浮卡片专用状态
   activeNote: null,        // 当前被点击的笔记对象

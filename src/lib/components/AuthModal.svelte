@@ -98,8 +98,7 @@
         <span class="text-3xl">🗺️</span> MapPin 登录
       </Dialog.Title>
       <Dialog.Description class="text-center">
-        她说 去**的花海;
-        我说 你这么说好帅.
+        Have you see my sister evelyn?
       </Dialog.Description>
     </Dialog.Header>
 

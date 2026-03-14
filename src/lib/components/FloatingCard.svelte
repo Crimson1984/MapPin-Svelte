@@ -4,7 +4,7 @@
   import DOMPurify from 'dompurify';
   
   import { uiState, currentUser } from '$lib/stores.js';
-  import { X, User, Clock, Edit3, Trash2, MapPin } from 'lucide-svelte';
+  import { X, User, Clock, Edit3, Trash2, MapPin, Hash } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
 
@@ -13,14 +13,24 @@
   import { notesData } from '$lib/stores.js'; // 用于拉取最新地图数据
   import { removeDraft } from '$lib/utils/draftManager.js'; // 引入草稿清理员
 
-  const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3000' : '';
+  const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3000' : '/api';
 
   let cleanHtml = '';
   let cardElement; // 引用卡片 DOM，用于拖拽重置
+  let currentTags = [];
 
   // ⚡️ 响应式引擎
   $: if ($uiState.activeNote) {
     parseMarkdown($uiState.activeNote);
+
+    const tagsData = $uiState.activeNote.tags;
+    if (Array.isArray(tagsData)) {
+        currentTags = tagsData;
+    } else if (typeof tagsData === 'string' && tagsData.trim()) {
+        currentTags = tagsData.split(',').filter(Boolean);
+    } else {
+        currentTags = [];
+    }
     
     // 每次点击新笔记时，清除之前拖拽留下的自定义坐标，让卡片回到默认智能避让位置
     if (cardElement) {
@@ -171,6 +181,23 @@
       destroy() { if (handle) handle.removeEventListener('mousedown', onMouseDown); }
     };
   }
+
+  function handleTagClick(tag) {
+    handleTagSearch(tag);
+  }
+
+  async function handleTagSearch(tagName) {
+    // 1. 点亮顶部的观察者横幅
+    $uiState.observingTag = tagName;
+    
+    // 2. 调用上一回合写的超级搜索接口
+    const res = await API.searchNotes(`#${tagName}`);
+    
+    // 3. 把搜出来的结果喂给地图和侧边栏
+    if (res.success) {
+        $notesData = res.data; 
+    }
+  }
 </script>
 
 {#if $uiState.activeNote}
@@ -215,6 +242,21 @@
             {new Date($uiState.activeNote.created_at || $uiState.activeNote.lastModified).toLocaleDateString()}
           </span>
         </div>
+
+        {#if currentTags.length > 0}
+            <div class="flex flex-wrap gap-1.5 mt-3">
+                {#each currentTags as tag}
+                    <button 
+                        class="flex items-center px-2 py-0.5 bg-blue-50/80 hover:bg-blue-100 text-blue-600 border border-blue-100/50 rounded-md text-[11px] font-medium transition-colors cursor-pointer"
+                        onclick={() => handleTagClick(tag)}
+                        title="点击搜索该标签"
+                    >
+                        <Hash class="w-3 h-3 mr-0.5 opacity-70" /> {tag}
+                    </button>
+                {/each}
+            </div>
+        {/if}
+        
       </div>
       
       <button class="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition relative z-10" onclick={closeCard}>

@@ -16,7 +16,7 @@
     UserCheck, Clock,Check, X, Bell,Trash2,Camera, Save, Lock, LogOut, Compass
   } from 'lucide-svelte';
 
-  const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3000' : '';
+  const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3000' : '/api';
 
   let profileData = null;
   let userNotes = [];

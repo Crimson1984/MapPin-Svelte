@@ -23,6 +23,8 @@
   let locationName = ''; 
   let isFetchingAddress = false;
 
+  let tagsString = '';
+
   $: if (lat && lng) {
     fetchAddress(lat, lng);
   }
@@ -38,6 +40,7 @@
         title = parsed.title || '';
         content = parsed.content || '';
         visibility = parsed.visibility || 'public';
+        tagsString = parsed.tagsString || ''
       } catch (e) {
         console.error('草稿解析失败', e);
       }
@@ -53,7 +56,7 @@
     if (!title.trim() && !content.trim()) return; // 全空不存
     
     // 构建标准的 draft 对象并交给草稿管理器
-    const draftData = { lat, lng, title, content, visibility, isDirty: true, locationName };
+    const draftData = { lat, lng, title, content, visibility, isDirty: true, locationName, tagsString };
     saveDraft(draftData); 
     
     if (closePopup) closePopup(); // 存完关闭，地图会自动刷新出灰点
@@ -61,7 +64,9 @@
 
   // 3. 打开详细编辑器 (纯内存传递，不写硬盘)
   function openFullEditor() {
-    $uiState.editingNote = { lat, lng, title, content, visibility, locationName };
+    const tagsArray = tagsString.trim() ? tagsString.trim().split(/\s+/).filter(Boolean) : [];
+
+    $uiState.editingNote = { lat, lng, title, content, visibility, locationName, tags: tagsArray };
     $uiState.isEditorOpen = true;
     if (closePopup) closePopup();
   }
@@ -71,8 +76,11 @@
     if (!title.trim() || !content.trim()) return alert('标题和内容不能为空！');
     
     isPublishing = true;
+
+    const tagsArray = tagsString.trim() ? tagsString.trim().split(/\s+/).filter(Boolean) : [];
+
     try {
-      const res = await API.createNote({ title, content, visibility, lat, lng, location_name: locationName || null });
+      const res = await API.createNote({ title, content, visibility, lat, lng, location_name: locationName || null, tags: tagsArray });
       if (res.success) {
         // ⚡️ 发布成功后，调用 draftManager 的标准删除方法，清理干净
         removeDraft({ lat, lng }); 
@@ -127,6 +135,12 @@
   </div>
 
   <Input bind:value={title} placeholder="标题..." class="h-9 text-sm focus-visible:ring-1" />
+
+  <Input 
+    bind:value={tagsString} 
+    placeholder="# 添加标签 (用空格分隔)" 
+    class="h-8 text-xs focus-visible:ring-1 text-blue-600 placeholder:text-gray-400 border-dashed" 
+  />
 
   <textarea bind:value={content} placeholder="写点什么..." class="w-full h-16 p-2.5 text-sm rounded-md border border-input bg-transparent shadow-sm focus:outline-none focus:ring-1 resize-none leading-relaxed"></textarea>
 

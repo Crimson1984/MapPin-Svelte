@@ -5,12 +5,13 @@
 
   import { Search, X, Loader2, User, FileText, MapPin, ArrowLeft } from 'lucide-svelte';
   
-  const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3000' : '';
+  const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3000' : '/api';
 
   // ⚡️ 核心状态
   let searchQuery = '';
   let isSearchOpen = false;
   let isLoading = false;
+  let isPlacesLoading = false; // 专门控制地点加载状态
   let activeTab = 'users'; // 默认显示的 Tab：'users' | 'notes' | 'places'
   let isMobileExpanded = false;
 
@@ -56,86 +57,161 @@
     }, 500);
   }
 
+  // async function performSearch(query) {
+  //   // 每次搜索前清空旧数据
+  //   userResults = [];
+  //   notesResults = []; 
+  //   placesResults = []; 
+
+  //   isLoading = true;          // 控制用户和笔记的 Loading
+  //   let isPlacesLoading = true; // 单独控制第三方地点的 Loading
+
+  //   try {
+  //     const osmPromise = fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=jsonv2&addressdetails=1&limit=5`)
+  //                         .then(res => res.json()).catch(() => []);
+      
+  //     const amapPromise = API.searchPlaces(query).catch(() => ({ data: [] }));
+
+  //     const [usersRes, notesRes, rawPlacesRes] = await Promise.all([
+  //       API.searchUsers(query).catch(err => { console.error('用户搜索失败:', err); return []; }),
+  //       API.searchNotes(query).catch(err => { console.error('笔记搜索失败:', err); return { data: [] }; }),
+  //       placeSearchEngine === 'osm' ? osmPromise : amapPromise
+  //     ]);
+      
+  //     // 判断如果它是个数组，就赋值给 userResults
+  //     if (Array.isArray(usersRes)) {
+  //       userResults = usersRes;
+  //     } else if (usersRes && usersRes.data) {
+  //       // 兼容一下如果你后端包了一层 { data: [...] } 的情况
+  //       userResults = usersRes.data;
+  //     }
+
+  //     // 灌入笔记结果 (处理你刚写的后端返回格式 { success: true, data: results })
+  //     if (Array.isArray(notesRes)) {
+  //       notesResults = notesRes;
+  //     } else if (notesRes && notesRes.data) {
+  //       notesResults = notesRes.data;
+  //     }
+
+  //     // ==========================================
+  //     // ⚡️ 核心黑科技：数据洗牌 (适配器模式)
+  //     // 把 OSM 和 高德 的乱七八糟的数据，统一洗成标准格式！
+  //     // ==========================================
+  //     if (placeSearchEngine === 'osm') {
+  //       // --- 清洗 OSM 数据 ---
+  //       placesResults = (Array.isArray(rawPlacesRes) ? rawPlacesRes : []).map(p => ({
+  //         id: p.place_id,
+  //         source: 'osm',
+  //         name: p.name || p.display_name.split(',')[0],
+  //         address: p.display_name,
+  //         type: p.type || p.category,
+  //         wgsLat: parseFloat(p.lat), // 本来就是 WGS84，直接用
+  //         wgsLng: parseFloat(p.lon),
+  //         boundingbox: p.boundingbox // OSM 特产：边界框
+  //       }));
+  //     } else {
+  //       // --- 清洗 高德 数据 ---
+  //       let amapData = Array.isArray(rawPlacesRes) ? rawPlacesRes : (rawPlacesRes && rawPlacesRes.data ? rawPlacesRes.data : []);
+  //       placesResults = amapData.map(p => {
+  //         // 解密坐标
+  //         const [lngStr, latStr] = p.location.split(',');
+  //         const [wgsLat, wgsLng] = toDB(parseFloat(latStr), parseFloat(lngStr));
+          
+  //         return {
+  //           id: p.id,
+  //           source: 'amap',
+  //           name: p.name,
+  //           address: `${p.pname||''}${p.cityname||''}${p.adname||''}${p.address||''}`,
+  //           type: p.type ? p.type.split(';')[0] : '地点',
+  //           wgsLat: wgsLat, // 已经洗白成 WGS84
+  //           wgsLng: wgsLng,
+  //           boundingbox: null // 高德没有边界框
+  //         };
+  //       });
+  //     }
+      
+  //   } catch (err) {
+  //     console.error('检索失败:', err);
+  //   } finally {
+  //     isLoading = false;
+  //   }
+  // }
+
+  // ⚡️ 新增联动指令：点击用户
+  
   async function performSearch(query) {
     // 每次搜索前清空旧数据
     userResults = [];
     notesResults = []; 
-    placesResults = []; 
+    if (activeTab !== 'places') placesResults = [];
 
-    isLoading = true;
+    // ⚡️ UI 优化：拆分两个 Loading 状态
+    isLoading = true;          // 控制用户和笔记的 Loading
+    isPlacesLoading = true; // 单独控制第三方地点的 Loading
 
-    try {
-      const osmPromise = fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=jsonv2&addressdetails=1&limit=5`)
-                          .then(res => res.json()).catch(() => []);
+    // ==========================================
+    // ⚡️ 第一梯队：光速返回的本地数据库查询 (绝不阻塞)
+    // ==========================================
+    Promise.all([
+      API.searchUsers(query).catch(err => { console.error('用户搜索失败:', err); return []; }),
+      API.searchNotes(query).catch(err => { console.error('笔记搜索失败:', err); return { data: [] }; })
+    ]).then(([usersRes, notesRes]) => {
+      // 灌入用户结果
+      userResults = Array.isArray(usersRes) ? usersRes : (usersRes && usersRes.data ? usersRes.data : []);
+      // 灌入笔记结果
+      notesResults = Array.isArray(notesRes) ? notesRes : (notesRes && notesRes.data ? notesRes.data : []);
       
-      const amapPromise = API.searchPlaces(query).catch(() => ({ data: [] }));
+      // 本地数据加载完毕，立刻关闭主 Loading，让用户瞬间看到前两项结果！
+      isLoading = false; 
+    });
 
-      const [usersRes, notesRes, rawPlacesRes] = await Promise.all([
-        API.searchUsers(query).catch(err => { console.error('用户搜索失败:', err); return []; }),
-        API.searchNotes(query).catch(err => { console.error('笔记搜索失败:', err); return { data: [] }; }),
-        placeSearchEngine === 'osm' ? osmPromise : amapPromise
-      ]);
-      
-      // 判断如果它是个数组，就赋值给 userResults
-      if (Array.isArray(usersRes)) {
-        userResults = usersRes;
-      } else if (usersRes && usersRes.data) {
-        // 兼容一下如果你后端包了一层 { data: [...] } 的情况
-        userResults = usersRes.data;
-      }
-
-      // 灌入笔记结果 (处理你刚写的后端返回格式 { success: true, data: results })
-      if (Array.isArray(notesRes)) {
-        notesResults = notesRes;
-      } else if (notesRes && notesRes.data) {
-        notesResults = notesRes.data;
-      }
-
-      // ==========================================
-      // ⚡️ 核心黑科技：数据洗牌 (适配器模式)
-      // 把 OSM 和 高德 的乱七八糟的数据，统一洗成标准格式！
-      // ==========================================
-      if (placeSearchEngine === 'osm') {
-        // --- 清洗 OSM 数据 ---
-        placesResults = (Array.isArray(rawPlacesRes) ? rawPlacesRes : []).map(p => ({
-          id: p.place_id,
-          source: 'osm',
-          name: p.name || p.display_name.split(',')[0],
-          address: p.display_name,
-          type: p.type || p.category,
-          wgsLat: parseFloat(p.lat), // 本来就是 WGS84，直接用
-          wgsLng: parseFloat(p.lon),
-          boundingbox: p.boundingbox // OSM 特产：边界框
-        }));
-      } else {
-        // --- 清洗 高德 数据 ---
-        let amapData = Array.isArray(rawPlacesRes) ? rawPlacesRes : (rawPlacesRes && rawPlacesRes.data ? rawPlacesRes.data : []);
-        placesResults = amapData.map(p => {
-          // 解密坐标
-          const [lngStr, latStr] = p.location.split(',');
-          const [wgsLat, wgsLng] = toDB(parseFloat(latStr), parseFloat(lngStr));
-          
-          return {
-            id: p.id,
-            source: 'amap',
-            name: p.name,
-            address: `${p.pname||''}${p.cityname||''}${p.adname||''}${p.address||''}`,
-            type: p.type ? p.type.split(';')[0] : '地点',
-            wgsLat: wgsLat, // 已经洗白成 WGS84
-            wgsLng: wgsLng,
-            boundingbox: null // 高德没有边界框
-          };
-        });
-      }
-      
-    } catch (err) {
-      console.error('检索失败:', err);
-    } finally {
-      isLoading = false;
+    // 特殊情况：如果用户刚好停留在“地点”标签页并且继续输入，直接触发地点搜索
+    if (activeTab === 'places' && query.trim()) {
+      performPlaceSearch(query);
     }
   }
 
-  // ⚡️ 新增联动指令：点击用户
+  // 独立的地点搜索：只有被叫到才会执行（目前仅保留高德）
+  async function performPlaceSearch(query) {
+    if (!query.trim()) return;
+    
+    isPlacesLoading = true; // 开启专属的地点加载动画
+    placesResults = [];
+
+    try {
+      const rawPlacesRes = await API.searchPlaces(query);
+      let amapData = Array.isArray(rawPlacesRes) ? rawPlacesRes : (rawPlacesRes && rawPlacesRes.data ? rawPlacesRes.data : []);
+      
+      placesResults = amapData.map(p => {
+        const [lngStr, latStr] = p.location.split(',');
+        const [wgsLat, wgsLng] = toDB(parseFloat(latStr), parseFloat(lngStr));
+        return {
+          id: p.id,
+          source: 'amap',
+          name: p.name,
+          address: `${p.pname||''}${p.cityname||''}${p.adname||''}${p.address||''}`,
+          type: p.type ? p.type.split(';')[0] : '地点',
+          wgsLat: wgsLat, 
+          wgsLng: wgsLng,
+          boundingbox: null 
+        };
+      });
+    } catch (err) {
+      console.error('高德地点检索失败:', err);
+    } finally {
+      isPlacesLoading = false; // 关闭专属加载动画
+    }
+  }
+
+  // ⚡️ 3. 标签切换拦截器：当用户点击标签时触发
+  function handleTabSwitch(tab) {
+    activeTab = tab;
+    // 核心黑科技：当且仅当切换到"地点"、搜索框有字、且还没搜过时，才发起高德请求
+    if (tab === 'places' && searchQuery.trim() && placesResults.length === 0) {
+      performPlaceSearch(searchQuery);
+    }
+  }
+  
   function handleUserClick(username) {
     $uiState.currentProfileUser = username;
     $uiState.isProfileDrawerOpen = true;
@@ -188,7 +264,7 @@
     };
   }
 
-  // ⚡️ 升级版：带边界框和红点指令的点击交互
+  // ⚡️ 带边界框和红点指令的点击交互
   function handlePlaceClick(place) {
     isSearchOpen = false;
     if (!searchQuery.trim()) isMobileExpanded = false;
@@ -256,13 +332,13 @@
     <div class="absolute top-14 left-0 w-full bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[60vh] animate-in fade-in slide-in-from-top-2 duration-200">
       
         <div class="flex border-b border-gray-100 bg-gray-50/50">
-            <button class="flex-1 py-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors {activeTab === 'users' ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-gray-500 hover:text-gray-700'}" onclick={() => activeTab = 'users'}>
+            <button class="flex-1 py-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors {activeTab === 'users' ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-gray-500 hover:text-gray-700'}" onclick={() => handleTabSwitch('users')}>
             <User class="w-4 h-4" /> 用户
             </button>
-            <button class="flex-1 py-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors {activeTab === 'notes' ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-gray-500 hover:text-gray-700'}" onclick={() => activeTab = 'notes'}>
+            <button class="flex-1 py-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors {activeTab === 'notes' ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-gray-500 hover:text-gray-700'}" onclick={() => handleTabSwitch('notes')}>
             <FileText class="w-4 h-4" /> 笔记
             </button>
-            <button class="flex-1 py-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors {activeTab === 'places' ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-gray-500 hover:text-gray-700'}" onclick={() => activeTab = 'places'}>
+            <button class="flex-1 py-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors {activeTab === 'places' ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-gray-500 hover:text-gray-700'}" onclick={() => handleTabSwitch('places')}>
             <MapPin class="w-4 h-4" /> 地点
             </button>
         </div>
@@ -361,30 +437,17 @@
 
                 {:else if activeTab === 'places'}
               
-                    <div class="px-3 py-2 border-b border-gray-100/50 bg-gray-50/50 flex justify-center">
-                        <div class="flex bg-gray-200/50 p-1 rounded-lg">
-                        <button 
-                            onclick={() => switchEngine('osm')}
-                            class="px-4 py-1.5 text-xs font-medium rounded-md transition-all {placeSearchEngine === 'osm' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
-                        >
-                            <span>OSM</span>
-                            <span class="text-[8px] bg-indigo-100 text-indigo-500 px-1 rounded">默认</span>
-                        </button>
-                        <button 
-                            onclick={() => switchEngine('amap')}
-                            class="px-4 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 {placeSearchEngine === 'amap' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
-                        >
-                            <span>高德</span>
-                            <span class="text-[8px] bg-indigo-100 text-indigo-500 px-1 rounded">国内</span>
-                        </button>
-                        </div>
+                    {#if isPlacesLoading}
+                    <div class="flex flex-col items-center justify-center py-12 text-gray-400">
+                        <Loader2 class="w-8 h-8 animate-spin mb-3 text-indigo-500" />
+                        <span class="text-xs tracking-widest">正在接入地图引擎...</span>
                     </div>
 
-                    {#if placesResults.length === 0}
-                        <div class="flex flex-col items-center justify-center py-10 text-gray-400">
+                    {:else if placesResults.length === 0}
+                    <div class="flex flex-col items-center justify-center py-12 text-gray-400">
                         <MapPin class="w-12 h-12 mb-3 stroke-[1px] opacity-50" />
-                        <span class="text-sm">{placeSearchEngine === 'osm' ? '未在世界地图上找到该地点' : '高德地图未找到该地点'}</span>
-                        </div>
+                        <span class="text-sm">未找到相关地点</span>
+                    </div>
                     {:else}
                         <div class="space-y-2 p-2">
                         {#each placesResults as place}
@@ -393,7 +456,7 @@
                             class="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors group border border-transparent hover:border-gray-100 w-full text-left"
                             onclick={() => handlePlaceClick(place)}
                             >
-                                <div class="p-2 sm:p-2.5 rounded-lg transition-colors shrink-0 mt-0.5 {place.source === 'osm' ? 'bg-blue-100 text-blue-500 group-hover:bg-blue-500 group-hover:text-white' : 'bg-indigo-100 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white'}">
+                                <div class="p-2 sm:p-2.5 rounded-lg transition-colors shrink-0 mt-0.5 bg-indigo-100 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white">
                                     <MapPin class="w-4 h-4" />
                                 </div>
                             
@@ -411,7 +474,7 @@
                                         {place.type}
                                     </span>
                                     <span class="text-[9px] font-medium text-gray-300 uppercase">
-                                        {place.source === 'osm' ? 'OpenStreetMap' : 'AMap'}
+                                        {place.source === 'AMap'}
                                     </span>
                                     </div>
                                 </div>
@@ -428,3 +491,4 @@
     </div>
   {/if}
 </div>
+

@@ -5,7 +5,7 @@ import { currentUser, uiState } from '$lib/stores.js';
 // 1. 基础配置：区分开发环境和生产环境
 // 假设你的 Express 后端运行在 3000 端口，请根据实际情况修改
 // import.meta.env.DEV 是 Vite 提供的环境变量，判断当前是否是 npm run dev
-const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3000' : ''; 
+const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3000' : '/api'; 
 
 // 获取 Token
 function getToken() {
@@ -148,4 +148,8 @@ export const API = {
     //高德API
     searchPlaces: (query) => request(`/gaode/search?q=${encodeURIComponent(query)}`),
     regeoAmap: (lat, lng) => request(`/gaode/regeo?lat=${lat}&lng=${lng}`),
+
+
+    //Tags
+    completeTag: (val) => request(`/tags/suggest?q=${encodeURIComponent(val)}`),
 };
