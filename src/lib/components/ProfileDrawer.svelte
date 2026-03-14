@@ -357,6 +357,17 @@ function handleNoteClick(note) {
       
       <div class="bg-gradient-to-b from-blue-50/50 to-white p-6 sm:p-8 border-b border-gray-100 flex flex-col items-center relative shrink-0">
         
+        {#if profileData.relation === 'self'}
+          <Button 
+            variant="ghost" 
+            class="absolute top-2 left-2 sm:top-5 sm:right-5 h-9 w-9 p-0 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100/80 transition-all" 
+            onclick={() => $uiState.isSettingsOpen = true}
+            title="系统设置"
+          >
+            <Settings class="w-5 h-5" />
+          </Button>
+        {/if}
+
         <div class="relative mb-3 sm:mb-4">
           <Avatar.Root class="h-20 w-20 sm:h-24 sm:w-24 shadow-lg ring-4 {isEditingProfile ? 'ring-blue-400 border-2 border-dashed border-blue-500' : 'ring-white'} transition-all">
             <Avatar.Image src={profileData.profile.avatar ? `${SERVER_URL}${profileData.profile.avatar}` : `${SERVER_URL}/uploads/avatars/default-avatar.png`} />
@@ -425,6 +436,8 @@ function handleNoteClick(note) {
               >
                 <Compass class="w-4 h-4 mr-2" /> 探索
               </Button>
+
+
             {/if}
             
           {:else if profileData.relation === 'friend'}

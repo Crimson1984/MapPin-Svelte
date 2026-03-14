@@ -548,6 +548,7 @@
                           {#if suggestedTags.length > 0}
                               <div class="px-3 py-1 text-[10px] font-bold text-gray-400 tracking-wider">猜你想搜</div>
                               {#each suggestedTags as suggest, index}
+                                  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions  -->
                                   <div 
                                       class="flex items-center justify-between px-3 py-2 text-sm cursor-pointer transition-colors
                                             {focusedSuggestIndex === index ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}"

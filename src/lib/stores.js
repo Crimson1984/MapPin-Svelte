@@ -52,4 +52,8 @@ export const uiState = writable({
   // ⚡️ 编辑器专属状态
   isEditorOpen: false,     // 控制详细编辑器是否打开
   editingNote: null,       // 当前正在编辑的草稿/笔记对象
+
+  isSettingsOpen: false,     // 控制设置弹窗的显示/隐藏
+  pwaInstallEvent: null,     // ⚡️ 核心：存放被拦截的原生安装事件
+  isIosDevice: false,        // 记录是否是苹果设备
 });

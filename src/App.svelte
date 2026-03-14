@@ -8,6 +8,8 @@
   import NoteEditor from '$lib/components/NoteEditor.svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import ObservationBanner from '$lib/components/ObservationBanner.svelte';
+  import InstallPrompt from '$lib/components/InstallPrompt.svelte';
+  import SettingsModal from '$lib/components/SettingsModal.svelte';
   
   import { notesData, currentUser, uiState } from '$lib/stores.js';
   import { refreshDraftsStore } from '$lib/utils/draftManager.js';
@@ -66,5 +68,10 @@
   <NoteEditor />
 
   <ObservationBanner onExit={restoreGlobalMap} />
+
+  <InstallPrompt />
+
+  <SettingsModal />
+
 
 </main>
